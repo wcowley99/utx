@@ -254,6 +254,49 @@ uint32_t eval_high_card(uint64_t hand) {
         }
 }
 
+uint32_t eval_quads(uint64_t hand, uint64_t c, uint64_t h, uint64_t d, uint64_t s) {
+        uint64_t quads = c & h & d & s;
+
+        if (!quads) {
+                return UINT32_MAX;
+        }
+        uint32_t rank = __builtin_ctzll(quads);
+        uint32_t kicker = 63 - __builtin_clzll(hand & ~quads);
+        return FOUR_OF_A_KIND_INDEX + (12 - rank) * 12 +
+               ((kicker > rank) ? 12 - kicker : 11 - kicker);
+}
+
+uint32_t eval_full_house(uint64_t trips, uint64_t pairs) {
+        if (trips && pairs) {
+                uint32_t trips_rank = 63 - __builtin_clzll(trips);
+                uint32_t pair_rank = 63 - __builtin_clzll(pairs);
+                return FULL_HOUSE_INDEX + (12 - trips_rank) * 12 +
+                       ((pair_rank > trips_rank) ? 12 - pair_rank : 11 - pair_rank);
+        } else {
+                return UINT32_MAX;
+        }
+}
+
+uint32_t eval_trips(uint64_t trips, uint64_t hand) {
+        if (!trips) {
+                return UINT32_MAX;
+        } else {
+                uint64_t kickers = hand & ~trips;
+                uint32_t trips_rank = 63 - __builtin_clzll(trips);
+                uint32_t kicker1 = 63 - __builtin_clzll(kickers);
+                uint32_t k1_adjusted = kicker1 - (kicker1 > trips_rank ? 1 : 0);
+                uint32_t kicker2 = 63 - __builtin_clzll(kickers & ~(1 << kicker1));
+                uint32_t k2_adjusted = kicker2 - (kicker2 > trips_rank ? 1 : 0);
+                printf("%d, %d\n", k1_adjusted, k2_adjusted);
+                return TRIPS_INDEX + ((12 - trips_rank) * 66) +
+                       (66 - k1_adjusted * (1 + k1_adjusted) / 2) + (k1_adjusted - k2_adjusted - 1);
+        }
+}
+
+uint32_t eval_pair(uint64_t pairs, uint64_t hand) {}
+
+uint32_t eval_two_pair(uint64_t pairs, uint64_t hand) {}
+
 /**
  * Evaluates the value of the best possible 5-card hand given a 7 cards
  */
@@ -272,18 +315,48 @@ uint32_t eval_hand(uint64_t hand) {
 
         // With 7 cards, a flush is mutually exclusive with four of a kind and full house, so we can
         // check these after
+        uint64_t c = ((hand & CLUB_BITMASK) >> CLUB_OFFSET);
+        uint64_t h = ((hand & HEART_BITMASK) >> HEART_OFFSET);
+        uint64_t d = ((hand & DIAMOND_BITMASK) >> DIAMOND_OFFSET);
+        uint64_t s = ((hand & SPADE_BITMASK) >> SPADE_OFFSET);
+        uint64_t flattened = c | h | d | s;
+
+        uint32_t quads_eval = eval_quads(flattened, c, h, d, s);
+        if (quads_eval != UINT32_MAX) {
+                return quads_eval;
+        }
+
+        // Trips bit will be set iff card is quads or trips, but since we already handled quads,
+        // this represents exclusively trips
+        uint32_t trips = (d & h & s) | (c & h & s) | (c & d & s) | (c & d & h);
+
+        // Likewise, pairs are all combinations of 2+, and no 3+
+        uint32_t pairs = ((d & s) | (h & s) | (h & d) | (c & s) | (c & d) | (c & h)) & ~trips;
+
+        uint32_t full_house_eval = eval_full_house(trips, pairs);
+        if (full_house_eval != UINT32_MAX) {
+                return full_house_eval;
+        }
 
         // Next, check for straight
-        uint64_t flattened =
-            ((hand & CLUB_BITMASK) >> CLUB_OFFSET) | ((hand & HEART_BITMASK) >> HEART_OFFSET) |
-            ((hand & DIAMOND_BITMASK) >> DIAMOND_OFFSET) | ((hand & SPADE_BITMASK) >> SPADE_OFFSET);
         uint32_t straight_eval = straight_rank(flattened);
         if (straight_eval != 0) {
                 return STRAIGHT_INDEX + 14 - straight_eval;
         }
 
-        // Nothing else worked so hand must be a high card
-        return eval_high_card(flattened);
+        uint32_t trips_eval = eval_trips(trips, flattened);
+        if (trips_eval != UINT32_MAX) {
+                return trips_eval;
+        }
+
+        switch (count_bits(pairs)) {
+        case 0:
+                return eval_high_card(flattened);
+        case 1:
+                return eval_pair(pairs, flattened);
+        default:
+                return eval_two_pair(pairs, flattened);
+        }
 }
 
 uint32_t eval_hand_strings(const char *c1, const char *c2, const char *c3, const char *c4,
