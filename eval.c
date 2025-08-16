@@ -127,6 +127,12 @@ Card create_card(const char *representation) {
         return card;
 }
 
+uint32_t card_index(uint64_t card) {
+        uint32_t index = __builtin_ctzll(card);
+
+        return index - 3 * (index / 16);
+}
+
 /**
  * Returns the number of bits set, for at most 14-bit values
  */
@@ -287,7 +293,7 @@ uint32_t eval_trips(uint64_t trips, uint64_t hand) {
                 uint32_t k1_adjusted = kicker1 - (kicker1 > trips_rank ? 1 : 0);
                 uint32_t kicker2 = 63 - __builtin_clzll(kickers & ~(1 << kicker1));
                 uint32_t k2_adjusted = kicker2 - (kicker2 > trips_rank ? 1 : 0);
-                printf("%d, %d\n", k1_adjusted, k2_adjusted);
+                // printf("%d, %d\n", k1_adjusted, k2_adjusted);
                 return TRIPS_INDEX + ((12 - trips_rank) * 66) +
                        (66 - k1_adjusted * (1 + k1_adjusted) / 2) + (k1_adjusted - k2_adjusted - 1);
         }
@@ -304,7 +310,7 @@ uint32_t eval_pair(uint64_t pairs, uint64_t hand) {
         kicker2 -= kicker2 > pair ? 1 : 0;
         kicker3 -= kicker3 > pair ? 1 : 0;
 
-        printf("%d, %d, %d, %d\n", pair, kicker1, kicker2, kicker3);
+        // printf("%d, %d, %d, %d\n", pair, kicker1, kicker2, kicker3);
 
         uint32_t p = 220 * pair;
         uint32_t h = (kicker1 * kicker1 * kicker1 - kicker1) / 6;

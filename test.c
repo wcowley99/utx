@@ -108,7 +108,7 @@ int test() {
         {
                 printf("Testing Flush Evaluations\n");
 
-                ASSERT_EQ(eval_hand_strings("Ad", "Kd", "Qd", "Jd", "9d", "2s", "3s"), 322);
+                ASSERT_EQ(eval_hand_strings("Ad", "Kd", "Qd", "Jd", "9d", "2s", "3s"), FLUSH_INDEX);
                 ASSERT_EQ(eval_hand_strings("7d", "5d", "4d", "3d", "2d", "2s", "3s"), 1598);
 
                 // Flushes of different suits are equal
@@ -123,7 +123,8 @@ int test() {
         {
                 printf("Testing Straight Evaluations\n");
 
-                ASSERT_EQ(eval_hand_strings("Ac", "Kh", "Qd", "Jc", "Td", "2s", "3s"), 1599);
+                ASSERT_EQ(eval_hand_strings("Ac", "Kh", "Qd", "Jc", "Td", "2s", "3s"),
+                          STRAIGHT_INDEX);
                 ASSERT_EQ(eval_hand_strings("Ad", "5h", "4d", "3c", "2d", "2s", "3s"), 1608);
 
                 // Straight with different suits are equal
@@ -138,7 +139,8 @@ int test() {
         {
                 printf("Testing High Card Evaluations\n");
 
-                ASSERT_EQ(eval_hand_strings("Ad", "Kh", "Qc", "Jd", "9c", "2s", "3s"), 6185);
+                ASSERT_EQ(eval_hand_strings("Ad", "Kh", "Qc", "Jd", "9c", "2s", "3s"),
+                          HIGH_CARD_INDEX);
                 ASSERT_EQ(eval_hand_strings("7h", "5h", "4c", "3d", "2d", "", ""), 7461);
 
                 // 5th kicker wins
