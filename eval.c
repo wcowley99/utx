@@ -293,9 +293,38 @@ uint32_t eval_trips(uint64_t trips, uint64_t hand) {
         }
 }
 
-uint32_t eval_pair(uint64_t pairs, uint64_t hand) {}
+uint32_t eval_pair(uint64_t pairs, uint64_t hand) {
+        // Called after we verified 1 pair
+        uint32_t pair = 63 - __builtin_clzll(pairs);
+        hand = hand & ~(1 << pair);
+        uint32_t kicker1 = 63 - __builtin_clzll(hand);
+        uint32_t kicker2 = 63 - __builtin_clzll(hand & ~(1 << kicker1));
+        uint32_t kicker3 = 63 - __builtin_clzll(hand & ~(1 << kicker1) & ~(1 << kicker2));
+        kicker1 -= kicker1 > pair ? 2 : 1;
+        kicker2 -= kicker2 > pair ? 1 : 0;
+        kicker3 -= kicker3 > pair ? 1 : 0;
 
-uint32_t eval_two_pair(uint64_t pairs, uint64_t hand) {}
+        printf("%d, %d, %d, %d\n", pair, kicker1, kicker2, kicker3);
+
+        uint32_t p = 220 * pair;
+        uint32_t h = (kicker1 * kicker1 * kicker1 - kicker1) / 6;
+        uint32_t m = (kicker2 * (kicker2 - 1) / 2);
+        uint32_t l = kicker3;
+
+        return PAIR_INDEX + NUM_PAIRS - p - h - m - l - 1;
+}
+
+uint32_t eval_two_pair(uint64_t pairs, uint64_t hand) {
+        // Called after we verified 2+ pairs
+        uint32_t pair1 = 63 - __builtin_clzll(pairs);
+        pairs = pairs & ~(1 << pair1);
+        uint32_t pair2 = 63 - __builtin_clzll(pairs);
+        uint32_t kicker = 63 - __builtin_clzll(hand & ~(1 << pair1) & ~(1 << pair2));
+        kicker -= (kicker > pair2 ? (kicker > pair1 ? 2 : 1) : 0);
+
+        return TWO_PAIR_INDEX + NUM_TWO_PAIRS - (pair1 * (pair1 - 1) / 2 * 11) - kicker -
+               (pair2 * 11) - 1;
+}
 
 /**
  * Evaluates the value of the best possible 5-card hand given a 7 cards

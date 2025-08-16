@@ -36,9 +36,8 @@ int test_suite(const char *filename) {
         file = fopen(filename, "r");
 
         uint32_t count = 0;
-        do {
-                printf("count: %d\n", count);
-                read = getline(&line, &len, file);
+        while ((read = getline(&line, &len, file)) != -1) {
+                // printf("count: %d\n", count);
 
                 for (int j = 2; j < 15; j += 3) {
                         line[j] = '\0';
@@ -53,7 +52,7 @@ int test_suite(const char *filename) {
                            count);
 
                 count += 1;
-        } while (read != -1);
+        }
 
         if (line) {
                 free(line);
@@ -136,20 +135,20 @@ int test() {
                           eval_hand_strings("Ah", "Ks", "Qd", "Jc", "Td", "9d", "8d"));
         }
 
-        // {
-        //         printf("Testing High Card Evaluations\n");
-        //
-        //         ASSERT_EQ(eval_hand_strings("Ad", "Kh", "Qc", "Jd", "9c", "2s", "3s"), 6185);
-        //         ASSERT_EQ(eval_hand_strings("7h", "5h", "4c", "3d", "2d", "", ""), 7461);
-        //
-        //         // 5th kicker wins
-        //         ASSERT(eval_hand_strings("8d", "6d", "5d", "4c", "2c", "", "") >
-        //                eval_hand_strings("8c", "6h", "5c", "4d", "3d", "", ""));
-        //
-        //         // 6th and 7th cards don't score
-        //         ASSERT_EQ(eval_hand_strings("Ah", "Kc", "Qc", "Js", "9d", "2s", "3s"),
-        //                   eval_hand_strings("Ad", "Kd", "Qs", "Jh", "9d", "8s", "3d"));
-        // }
+        {
+                printf("Testing High Card Evaluations\n");
+
+                ASSERT_EQ(eval_hand_strings("Ad", "Kh", "Qc", "Jd", "9c", "2s", "3s"), 6185);
+                ASSERT_EQ(eval_hand_strings("7h", "5h", "4c", "3d", "2d", "", ""), 7461);
+
+                // 5th kicker wins
+                ASSERT(eval_hand_strings("8d", "6d", "5d", "4c", "2c", "", "") >
+                       eval_hand_strings("8c", "6h", "5c", "4d", "3d", "", ""));
+
+                // 6th and 7th cards don't score
+                ASSERT_EQ(eval_hand_strings("Ah", "Kc", "Qc", "Js", "9d", "2s", "3s"),
+                          eval_hand_strings("Ad", "Kd", "Qs", "Jh", "9d", "8s", "3d"));
+        }
 
         {
                 printf("Testing Four of a Kind Evaluations\n");
@@ -179,8 +178,10 @@ int test() {
         {
                 printf("Testing vs. 5-card suite\n");
 
-                return test_suite("test-suite-1.txt") || test_suite("test-suite-1.txt") ||
-                       test_suite("test-suite-1.txt") || test_suite("test-suite-1.txt");
+                ASSERT_EQ(test_suite("test-suite-1.txt"), 0);
+                ASSERT_EQ(test_suite("test-suite-2.txt"), 0);
+                ASSERT_EQ(test_suite("test-suite-3.txt"), 0);
+                ASSERT_EQ(test_suite("test-suite-4.txt"), 0);
         }
 
         printf("All Tests Ran Successfully.\n");
