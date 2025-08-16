@@ -8,7 +8,15 @@
                         printf("[%s:%d]: %s is not equal to %s.\n", __FILE__, __LINE__, #x, #y);   \
                         return -1;                                                                 \
                 }                                                                                  \
-        } while (0);
+        } while (0)
+
+#define ASSERT(x)                                                                                  \
+        do {                                                                                       \
+                if (!(x)) {                                                                        \
+                        printf("[%s:%d]: Expected '%s' to be true, was false.\n", __FILE__,        \
+                               __LINE__, #x);                                                      \
+                }                                                                                  \
+        } while (0)
 
 int test() {
         printf("Running Tests...\n");
@@ -32,25 +40,78 @@ int test() {
                 ASSERT_EQ(count_bits(0b10101100101001), 7);
                 ASSERT_EQ(count_bits(0), 0);
 
-                ASSERT_EQ(straight_rank(0x1F00), 13); // Ace
-                ASSERT_EQ(straight_rank(0x0F80), 12); // King
-                ASSERT_EQ(straight_rank(0x07C0), 11); // Queen
+                ASSERT_EQ(straight_rank(0x1F00), 14); // Ace
+                ASSERT_EQ(straight_rank(0x0F80), 13); // King
+                ASSERT_EQ(straight_rank(0x07C0), 12); // Queen
                 ASSERT_EQ(straight_rank(0x100F), 5);  // Wheel
         }
 
         {
-                printf("Testing Flush Evalutaions\n");
+                printf("Testing Straight Flush Evaluations\n");
 
-                ASSERT_EQ(eval_hand_strings("Ad", "Kd", "Qd", "Jd", "9d", "2s", "3s"), 323);
-                ASSERT_EQ(eval_hand_strings("7d", "5d", "4d", "3d", "2d", "2s", "3s"), 1599);
+                ASSERT_EQ(eval_hand_strings("Ad", "Kd", "Qd", "Jd", "Td", "2s", "3s"), 0);
+                ASSERT_EQ(eval_hand_strings("Ad", "5d", "4d", "3d", "2d", "2s", "3s"), 9);
+
+                // Straight Flushes of different suits are equal
+                ASSERT_EQ(eval_hand_strings("6d", "5d", "4d", "3d", "2d", "2s", "3s"),
+                          eval_hand_strings("6c", "5c", "4c", "3c", "2c", "2s", "3s"));
+
+                // 6th and 7th cards don't score
+                ASSERT_EQ(eval_hand_strings("Ad", "Kd", "Qd", "Jd", "Td", "2s", "3s"),
+                          eval_hand_strings("Ad", "Kd", "Qd", "Jd", "Td", "9d", "8d"));
+        }
+
+        {
+                printf("Testing Flush Evaluations\n");
+
+                ASSERT_EQ(eval_hand_strings("Ad", "Kd", "Qd", "Jd", "9d", "2s", "3s"), 322);
+                ASSERT_EQ(eval_hand_strings("7d", "5d", "4d", "3d", "2d", "2s", "3s"), 1598);
+
+                // Flushes of different suits are equal
+                ASSERT_EQ(eval_hand_strings("7d", "5d", "4d", "3d", "2d", "2s", "3s"),
+                          eval_hand_strings("7c", "5c", "4c", "3c", "2c", "2s", "3s"));
+
+                // 6th and 7th cards don't score
+                ASSERT_EQ(eval_hand_strings("Ad", "Kd", "Qd", "Jd", "9d", "2s", "3s"),
+                          eval_hand_strings("Ad", "Kd", "Qd", "Jd", "9d", "8d", "3d"));
+        }
+
+        {
+                printf("Testing Straight Evaluations\n");
+
+                ASSERT_EQ(eval_hand_strings("Ac", "Kh", "Qd", "Jc", "Td", "2s", "3s"), 1599);
+                ASSERT_EQ(eval_hand_strings("Ad", "5h", "4d", "3c", "2d", "2s", "3s"), 1608);
+
+                // Straight with different suits are equal
+                ASSERT_EQ(eval_hand_strings("6h", "5d", "4c", "3d", "2d", "2s", "3s"),
+                          eval_hand_strings("6d", "5s", "4d", "3c", "2c", "2s", "3s"));
+
+                // 6th and 7th cards don't score
+                ASSERT_EQ(eval_hand_strings("Ac", "Kd", "Qd", "Jh", "Td", "2s", "3s"),
+                          eval_hand_strings("Ah", "Ks", "Qd", "Jc", "Td", "9d", "8d"));
+        }
+
+        {
+                printf("Testing High Card Evaluations\n");
+
+                ASSERT_EQ(eval_hand_strings("Ad", "Kh", "Qc", "Jd", "9c", "2s", "3s"), 6185);
+                ASSERT_EQ(eval_hand_strings("7h", "5h", "4c", "3d", "2d", "", ""), 7461);
+
+                // 5th kicker wins
+                ASSERT(eval_hand_strings("8d", "6d", "5d", "4c", "2c", "", "") >
+                       eval_hand_strings("8c", "6h", "5c", "4d", "3d", "", ""));
+
+                // 6th and 7th cards don't score
+                ASSERT_EQ(eval_hand_strings("Ah", "Kc", "Qc", "Js", "9d", "2s", "3s"),
+                          eval_hand_strings("Ad", "Kd", "Qs", "Jh", "9d", "8s", "3d"));
         }
 
         {
                 printf("Testing Evaluation Function\n");
 
                 // Two royal flushes should have equal values
-                ASSERT_EQ(eval_hand_strings("Ac", "Kc", "Qc", "Jc", "10c", "Ad", "As"),
-                          eval_hand_strings("Ah", "Kh", "Qh", "Jh", "10h", "Ad", "As"))
+                ASSERT_EQ(eval_hand_strings("Ac", "Kc", "Qc", "Jc", "Tc", "Ad", "As"),
+                          eval_hand_strings("Ah", "Kh", "Qh", "Jh", "Th", "Ad", "As"));
         }
 
         printf("All Tests Ran Successfully.\n");

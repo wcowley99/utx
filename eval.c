@@ -30,7 +30,27 @@ const uint64_t QUEEN_BITMASK = DEUCE_BITMASK << 10;
 const uint64_t KING_BITMASK = DEUCE_BITMASK << 11;
 const uint64_t ACE_BITMASK = DEUCE_BITMASK << 12;
 
+// http:// suffe.cool/poker/evaluator.html
+// https://en.wikipedia.org/wiki/Poker_probability
 #define NUM_HIGH_CARD_HANDS 1277
+#define NUM_STRAIGHT_FLUSHES 10
+#define NUM_FOUR_OF_A_KINDS 156
+#define NUM_FULL_HOUSES 156
+#define NUM_FLUSHES NUM_HIGH_CARD_HANDS
+#define NUM_STRAIGHTS 10
+#define NUM_TRIPS 858
+#define NUM_TWO_PAIRS 858
+#define NUM_PAIRS 2860
+
+const uint32_t STRAIGHT_FLUSH_INDEX = 0;
+const uint32_t FOUR_OF_A_KIND_INDEX = STRAIGHT_FLUSH_INDEX + NUM_STRAIGHT_FLUSHES;
+const uint32_t FULL_HOUSE_INDEX = FOUR_OF_A_KIND_INDEX + NUM_FOUR_OF_A_KINDS;
+const uint32_t FLUSH_INDEX = FULL_HOUSE_INDEX + NUM_FULL_HOUSES;
+const uint32_t STRAIGHT_INDEX = FLUSH_INDEX + NUM_FLUSHES;
+const uint32_t TRIPS_INDEX = STRAIGHT_INDEX + NUM_STRAIGHTS;
+const uint32_t TWO_PAIR_INDEX = TRIPS_INDEX + NUM_TRIPS;
+const uint32_t PAIR_INDEX = TWO_PAIR_INDEX + NUM_TWO_PAIRS;
+const uint32_t HIGH_CARD_INDEX = PAIR_INDEX + NUM_PAIRS;
 
 uint64_t unique_five_lookup_table[NUM_HIGH_CARD_HANDS];
 
@@ -119,7 +139,7 @@ uint32_t straight_rank(uint64_t hand) {
         const uint64_t straight_bitmask = 0x1F00;
         uint64_t acc = hand;
 
-        uint32_t rank = 13; // Ace
+        uint32_t rank = 14; // Ace
         do {
                 // 11011 & 11111 -> 11011 -> 00100
                 uint64_t mask = ~(acc & straight_bitmask) & straight_bitmask;
@@ -137,23 +157,30 @@ uint32_t straight_rank(uint64_t hand) {
         return (hand & 0x100F) == 0x100F ? 5 : 0;
 }
 
+uint64_t get_flushed_cards(uint64_t hand) {
+        uint64_t club_bits = (hand & CLUB_BITMASK) >> CLUB_OFFSET;
+        uint64_t heart_bits = (hand & HEART_BITMASK) >> HEART_OFFSET;
+        uint64_t diamond_bits = (hand & DIAMOND_BITMASK) >> DIAMOND_OFFSET;
+        uint64_t spade_bits = (hand & SPADE_BITMASK) >> SPADE_OFFSET;
+
+        return (count_bits(club_bits) >= 5 ? club_bits : 0) |
+               (count_bits(heart_bits) >= 5 ? heart_bits : 0) |
+               (count_bits(diamond_bits) >= 5 ? diamond_bits : 0) |
+               (count_bits(spade_bits) >= 5 ? spade_bits : 0);
+}
+
 /**
  * Attempts to evaluate the score of a hand as straight flush, or returns UINT64_MAX if not a
  * straight flush
  */
 uint32_t eval_straight_flush(uint64_t hand) {
-        // Does hand contain a straight flush?
-        const uint64_t sf_bitmask = 0x1111100000000;
-        uint32_t count = 0;
-
-        while (count < 9) {
-                uint64_t mask = hand & sf_bitmask;
-                if (mask == sf_bitmask) {
-                        return count;
-                }
+        uint64_t flush = get_flushed_cards(hand);
+        if (!flush) {
+                return UINT32_MAX;
+        } else {
+                uint32_t rank = straight_rank(flush);
+                return rank == 0 ? UINT32_MAX : 14 - rank;
         }
-
-        return UINT32_MAX;
 }
 
 /**
@@ -161,15 +188,7 @@ uint32_t eval_straight_flush(uint64_t hand) {
  * straight flush
  */
 uint32_t eval_flush(uint64_t hand) {
-        uint64_t club_bits = (hand & CLUB_BITMASK) >> CLUB_OFFSET;
-        uint64_t heart_bits = (hand & HEART_BITMASK) >> HEART_OFFSET;
-        uint64_t diamond_bits = (hand & DIAMOND_BITMASK) >> DIAMOND_OFFSET;
-        uint64_t spade_bits = (hand & SPADE_BITMASK) >> SPADE_OFFSET;
-
-        uint64_t flush = (count_bits(club_bits) >= 5 ? club_bits : 0) |
-                         (count_bits(heart_bits) >= 5 ? heart_bits : 0) |
-                         (count_bits(diamond_bits) >= 5 ? diamond_bits : 0) |
-                         (count_bits(spade_bits) >= 5 ? spade_bits : 0);
+        uint64_t flush = get_flushed_cards(hand);
 
         if (!flush) {
                 return UINT32_MAX;
@@ -197,7 +216,39 @@ uint32_t eval_flush(uint64_t hand) {
         }
 
         if (index != UINT32_MAX) { // found index
-                return 1599 - index;
+                return FLUSH_INDEX + NUM_FLUSHES - index - 1;
+        } else {
+                return UINT32_MAX;
+        }
+}
+
+uint32_t eval_high_card(uint64_t hand) {
+        uint64_t hc =
+            ((hand & CLUB_BITMASK) >> CLUB_OFFSET) | ((hand & HEART_BITMASK) >> HEART_OFFSET) |
+            ((hand & DIAMOND_BITMASK) >> DIAMOND_OFFSET) | ((hand & SPADE_BITMASK) >> SPADE_OFFSET);
+
+        for (uint32_t i = count_bits(hc); i > 5; i -= 1) {
+                // Flip the least significant 1-bit to 0
+                hc = hc ^ (hc & -hc);
+        }
+
+        uint32_t l = 0;
+        uint32_t r = 1277;
+        uint32_t index = UINT32_MAX;
+        while (l != r) {
+                uint32_t mid = (l + r) / 2;
+                if (unique_five_lookup_table[mid] > hc) {
+                        r = mid;
+                } else if (unique_five_lookup_table[mid] < hc) {
+                        l = mid;
+                } else {
+                        index = mid;
+                        break;
+                }
+        }
+
+        if (index != UINT32_MAX) { // found index
+                return HIGH_CARD_INDEX + NUM_HIGH_CARD_HANDS - index - 1;
         } else {
                 return UINT32_MAX;
         }
@@ -207,12 +258,32 @@ uint32_t eval_flush(uint64_t hand) {
  * Evaluates the value of the best possible 5-card hand given a 7 cards
  */
 uint32_t eval_hand(uint64_t hand) {
+
+        uint32_t straight_flush_eval = eval_straight_flush(hand);
+        if (straight_flush_eval != UINT32_MAX) {
+                return straight_flush_eval;
+        }
+
         // Does hand contain a flush?
         uint32_t flush_eval = eval_flush(hand);
         if (flush_eval != UINT32_MAX) {
                 return flush_eval;
         }
-        return UINT32_MAX;
+
+        // With 7 cards, a flush is mutually exclusive with four of a kind and full house, so we can
+        // check these after
+
+        // Next, check for straight
+        uint64_t flattened =
+            ((hand & CLUB_BITMASK) >> CLUB_OFFSET) | ((hand & HEART_BITMASK) >> HEART_OFFSET) |
+            ((hand & DIAMOND_BITMASK) >> DIAMOND_OFFSET) | ((hand & SPADE_BITMASK) >> SPADE_OFFSET);
+        uint32_t straight_eval = straight_rank(flattened);
+        if (straight_eval != 0) {
+                return STRAIGHT_INDEX + 14 - straight_eval;
+        }
+
+        // Nothing else worked so hand must be a high card
+        return eval_high_card(flattened);
 }
 
 uint32_t eval_hand_strings(const char *c1, const char *c2, const char *c3, const char *c4,
@@ -233,7 +304,4 @@ void init_high_cards() {
                 unique_five_lookup_table[i] = index;
                 index += 1;
         }
-
-        printf("smallest: %lx | biggest: %lx\n", unique_five_lookup_table[0],
-               unique_five_lookup_table[1276]);
 }
